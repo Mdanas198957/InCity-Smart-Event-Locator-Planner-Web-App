@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InCity — Smart Event Intelligence · India</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --navy: #010d1a;
+  --navy-mid: #021428;
+  --navy-light: #052040;
+  --gold: #c9a84c;
+  --gold-bright: #e8c96a;
+  --gold-dim: #8a6f2e;
+  --cream: #f5ead8;
+  --red-risk: #e84545;
+  --orange-risk: #e89045;
+  --green-safe: #3dbd7d;
+  --glass: rgba(255,255,255,0.04);
+  --glass-border: rgba(201,168,76,0.18);
+  --text-dim: rgba(245,234,216,0.5);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--navy);
+  color: var(--cream);
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden;
+  cursor: default;
+}
+
+/* ========== CUSTOM SCROLLBAR ========== */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--navy); }
+::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 2px; }
+
+/* ========== NOISE TEXTURE OVERLAY ========== */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:9999; opacity:0.4;
+}
+
+/* ========== NAV ========== */
+nav {
+  position: fixed; top:0; left:0; right:0; z-index:1000;
+  padding: 18px 48px;
+  display: flex; align-items:center; justify-content:space-between;
+  background: linear-gradient(180deg, rgba(1,13,26,0.95) 0%, transparent 100%);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
+}
+.nav-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.6rem; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--gold-bright);
+  display: flex; align-items:center; gap: 8px;
+}
+.nav-logo span { color: var(--cream); font-weight:300; }
+.nav-links { display:flex; gap:32px; align-items:center; }
+.nav-links a {
+  font-size: 0.8rem; letter-spacing: 0.12em; text-transform:uppercase;
+  color: var(--text-dim); text-decoration:none; transition: color 0.3s;
+}
+.nav-links a:hover, .nav-links a.active { color: var(--gold); }
+.nav-cta {
+  padding: 9px 22px; border: 1px solid var(--gold);
+  border-radius: 2px; background: transparent;
+  color: var(--gold); font-size: 0.78rem; letter-spacing: 0.12em;
+  text-transform:uppercase; cursor:pointer; transition: all 0.3s;
+  font-family: 'DM Sans', sans-serif;
+}
+.nav-cta:hover { background: var(--gold); color: var(--navy); }
+
+/* ========== HERO ========== */
+.hero {
+  min-height: 100vh;
+  display: flex; align-items:center;
+  padding: 0 48px;
+  position: relative; overflow:hidden;
+}
+.hero-bg {
+  position:absolute; inset:0;
+  background: radial-gradient(ellipse 80% 60% at 60% 40%, rgba(201,168,76,0.06) 0%, transparent 70%),
+              radial-gradient(ellipse 60% 80% at 20% 80%, rgba(5,32,64,0.8) 0%, transparent 60%),
+              linear-gradient(135deg, #010d1a 0%, #021428 50%, #010d1a 100%);
+}
+.hero-grid {
+  position:absolute; inset:0; overflow:hidden; opacity:0.06;
+  background-image: linear-gradient(var(--gold) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--gold) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+.hero-content { position:relative; z-index:2; max-width:680px; }
+.hero-eyebrow {
+  font-size: 0.7rem; letter-spacing: 0.3em; text-transform:uppercase;
+  color: var(--gold); margin-bottom: 24px;
+  display: flex; align-items:center; gap:12px;
+}
+.hero-eyebrow::before {
+  content:''; width:40px; height:1px; background: var(--gold);
+}
+.hero h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(3rem, 6vw, 5.5rem); font-weight: 300; line-height: 1.05;
+  margin-bottom: 24px; letter-spacing: -0.02em;
+}
+.hero h1 em { font-style: italic; color: var(--gold); }
+.hero p {
+  font-size: 1rem; color: var(--text-dim); line-height: 1.7;
+  max-width: 480px; margin-bottom: 40px;
+}
+.hero-actions { display:flex; gap:16px; flex-wrap:wrap; }
+.btn-primary {
+  padding: 14px 32px; background: var(--gold);
+  border: none; border-radius: 2px; color: var(--navy);
+  font-size: 0.82rem; font-weight: 600; letter-spacing: 0.1em;
+  text-transform:uppercase; cursor:pointer; transition: all 0.3s;
+  font-family: 'DM Sans', sans-serif;
+}
+.btn-primary:hover { background: var(--gold-bright); transform: translateY(-2px); }
+.btn-secondary {
+  padding: 14px 32px; background: transparent;
+  border: 1px solid rgba(201,168,76,0.4); border-radius: 2px;
+  color: var(--cream); font-size: 0.82rem; letter-spacing: 0.1em;
+  text-transform:uppercase; cursor:pointer; transition: all 0.3s;
+  font-family: 'DM Sans', sans-serif;
+}
+.btn-secondary:hover { border-color: var(--gold); color: var(--gold); }
+.hero-stats {
+  position:absolute; right:48px; top:50%; transform: translateY(-50%);
+  display:flex; flex-direction:column; gap:24px; z-index:2;
+}
+.stat-card {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px); border-radius: 4px;
+  padding: 20px 24px; min-width: 160px;
+  animation: floatStat 4s ease-in-out infinite;
+}
+.stat-card:nth-child(2) { animation-delay: -1.3s; }
+.stat-card:nth-child(3) { animation-delay: -2.6s; }
+@keyframes floatStat {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.stat-val {
+  font-family: 'Space Mono', monospace;
+  font-size: 1.8rem; color: var(--gold); font-weight: 700; line-height:1;
+}
+.stat-label { font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; letter-spacing:0.08em; text-transform:uppercase; }
+.india-outline {
+  position:absolute; right: 260px; top:50%; transform:translateY(-52%);
+  opacity: 0.07; z-index:1; pointer-events:none;
+}
+
+/* ========== SECTION SHARED ========== */
+section { padding: 80px 48px; }
+.section-label {
+  font-size: 0.68rem; letter-spacing: 0.3em; text-transform:uppercase;
+  color: var(--gold); margin-bottom: 12px;
+}
+.section-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 400; line-height: 1.1;
+  margin-bottom: 40px;
+}
+.divider { width: 60px; height: 1px; background: var(--gold-dim); margin-bottom: 40px; }
+
+/* ========== SEARCH BAR ========== */
+.search-section {
+  padding: 0 48px 60px;
+}
+.search-bar {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px); border-radius: 4px;
+  padding: 24px 32px; display: flex; gap:16px; align-items:center; flex-wrap:wrap;
+}
+.search-field {
+  flex:1; min-width: 160px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.search-field label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform:uppercase; color: var(--gold-dim); }
+.search-field select, .search-field input {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 2px; padding: 10px 14px; color: var(--cream);
+  font-family: 'DM Sans', sans-serif; font-size: 0.88rem; outline:none;
+  transition: border-color 0.3s;
+}
+.search-field select:focus, .search-field input:focus { border-color: var(--gold-dim); }
+.search-field select option { background: var(--navy-mid); }
+.search-btn {
+  padding: 10px 28px; background: var(--gold);
+  border: none; border-radius: 2px; color: var(--navy);
+  font-size: 0.82rem; font-weight: 600; cursor:pointer;
+  transition: all 0.3s; align-self: flex-end; margin-top: 22px;
+  font-family: 'DM Sans', sans-serif; letter-spacing: 0.08em; text-transform:uppercase;
+}
+.search-btn:hover { background: var(--gold-bright); }
+
+/* ========== MAP SECTION ========== */
+.map-section { padding: 0 48px 80px; }
+.map-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px; flex-wrap:wrap; gap:16px; }
+.map-filters { display:flex; gap:10px; flex-wrap:wrap; }
+.filter-chip {
+  padding: 7px 16px; border-radius: 20px; font-size: 0.75rem;
+  border: 1px solid var(--glass-border); background: var(--glass);
+  color: var(--text-dim); cursor:pointer; transition: all 0.3s;
+  letter-spacing:0.06em; backdrop-filter:blur(8px);
+}
+.filter-chip:hover, .filter-chip.active { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,0.08); }
+.map-wrapper {
+  position:relative; border-radius: 6px; overflow:hidden;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+}
+#map { height: 520px; width:100%; }
+.map-overlay-legend {
+  position:absolute; bottom:16px; left:16px; z-index:500;
+  background: rgba(1,13,26,0.92); backdrop-filter:blur(16px);
+  border: 1px solid var(--glass-border); border-radius: 4px;
+  padding: 16px 20px;
+}
+.map-overlay-legend h4 { font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:10px; }
+.legend-row { display:flex; align-items:center; gap:10px; margin-bottom:7px; font-size:0.75rem; color:var(--text-dim); }
+.legend-dot { width:10px; height:10px; border-radius:50%; }
+.ai-badge {
+  position:absolute; top:16px; right:16px; z-index:500;
+  background: rgba(1,13,26,0.92); backdrop-filter:blur(16px);
+  border: 1px solid rgba(201,168,76,0.3); border-radius: 4px;
+  padding: 10px 16px; display:flex; align-items:center; gap:8px;
+  font-size: 0.72rem; color: var(--gold); letter-spacing:0.1em;
+}
+.ai-pulse { width:8px; height:8px; border-radius:50%; background:var(--green-safe); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:0.5; transform:scale(1.4)} }
+
+/* ========== CROWD AI PANEL ========== */
+.crowd-ai-section { padding: 0 48px 80px; }
+.ai-grid { display:grid; grid-template-columns: 1fr 1fr; gap:24px; }
+@media(max-width:900px){ .ai-grid { grid-template-columns:1fr; } }
+.ai-card {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px); border-radius: 6px; padding: 28px;
+  position:relative; overflow:hidden;
+}
+.ai-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.ai-card-title { font-size:0.7rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:16px; }
+.detection-grid {
+  display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-bottom:16px;
+}
+.det-cell {
+  aspect-ratio: 1; border-radius:3px; display:flex; align-items:center; justify-content:center;
+  font-family:'Space Mono',monospace; font-size:0.6rem; font-weight:700;
+  transition: all 0.5s;
+}
+.det-cell.red { background: rgba(232,69,69,0.3); color:#e84545; border:1px solid rgba(232,69,69,0.4); }
+.det-cell.orange { background: rgba(232,144,69,0.3); color:#e89045; border:1px solid rgba(232,144,69,0.4); }
+.det-cell.green { background: rgba(61,189,125,0.3); color:#3dbd7d; border:1px solid rgba(61,189,125,0.4); }
+.det-cell.dim { background: rgba(255,255,255,0.03); color:var(--text-dim); border:1px solid rgba(255,255,255,0.05); }
+.density-bar-wrap { margin-bottom:12px; }
+.density-bar-label { display:flex; justify-content:space-between; font-size:0.73rem; color:var(--text-dim); margin-bottom:5px; }
+.density-bar-track { height:5px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden; }
+.density-bar-fill { height:100%; border-radius:3px; transition: width 0.8s ease; }
+.model-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  padding: 4px 10px; border-radius:2px; font-size:0.65rem;
+  letter-spacing:0.1em; text-transform:uppercase; margin-right:8px; margin-bottom:8px;
+  border: 1px solid;
+}
+.model-yolo { border-color:rgba(61,189,125,0.4); color:#3dbd7d; background:rgba(61,189,125,0.08); }
+.model-csrnet { border-color:rgba(201,168,76,0.4); color:var(--gold); background:rgba(201,168,76,0.08); }
+.crowd-count {
+  font-family:'Space Mono',monospace; font-size:2.8rem; font-weight:700;
+  color: var(--gold); line-height:1;
+}
+.crowd-count-sub { font-size:0.72rem; color:var(--text-dim); margin-top:4px; }
+.risk-meter { margin-top:16px; }
+.risk-track {
+  height:8px; border-radius:4px;
+  background: linear-gradient(90deg, #3dbd7d, #e89045, #e84545);
+  position:relative; margin-bottom:6px;
+}
+.risk-needle {
+  position:absolute; top:-4px; width:16px; height:16px; border-radius:50%;
+  background: white; border: 2px solid var(--navy);
+  box-shadow: 0 0 8px rgba(255,255,255,0.5);
+  transition: left 0.8s cubic-bezier(0.34,1.56,0.64,1);
+}
+.risk-labels { display:flex; justify-content:space-between; font-size:0.62rem; color:var(--text-dim); }
+.alert-list { margin-top:16px; }
+.alert-item {
+  display:flex; align-items:flex-start; gap:10px;
+  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size:0.8rem;
+}
+.alert-item:last-child { border-bottom:none; }
+.alert-dot { width:6px; height:6px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+
+/* ========== EVENT STACK SECTION ========== */
+.events-section { padding: 0 48px 80px; }
+.events-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:32px; flex-wrap:wrap; gap:16px; }
+.state-tabs { display:flex; gap:8px; flex-wrap:wrap; }
+.state-tab {
+  padding: 8px 18px; border-radius:2px; font-size:0.75rem;
+  border: 1px solid var(--glass-border); background: var(--glass);
+  color: var(--text-dim); cursor:pointer; transition: all 0.3s;
+  letter-spacing:0.06em; backdrop-filter:blur(8px);
+}
+.state-tab.active { border-color:var(--gold); color:var(--navy); background:var(--gold); font-weight:600; }
+.events-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:24px; }
+.event-card {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px); border-radius: 6px; overflow:hidden;
+  transition: all 0.4s; cursor:pointer; position:relative;
+}
+.event-card:hover { transform: translateY(-6px); border-color: rgba(201,168,76,0.35); box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+.event-card-banner {
+  height: 120px; position:relative; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+}
+.event-card-banner::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(to bottom, transparent 30%, rgba(1,13,26,0.8) 100%);
+}
+.event-cat-badge {
+  position:absolute; top:12px; left:12px; z-index:2;
+  padding: 4px 10px; border-radius:2px; font-size:0.62rem;
+  letter-spacing:0.12em; text-transform:uppercase; font-weight:600;
+}
+.event-rank-badge {
+  position:absolute; top:12px; right:12px; z-index:2;
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background: rgba(1,13,26,0.85); border: 1px solid var(--gold);
+  font-family:'Space Mono',monospace; font-size:0.72rem; font-weight:700; color:var(--gold);
+}
+.event-card-body { padding: 20px; }
+.event-card-state { font-size:0.62rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:4px; }
+.event-card-title { font-family:'Cormorant Garamond',serif; font-size:1.25rem; font-weight:500; line-height:1.2; margin-bottom:10px; }
+.event-card-meta { display:flex; gap:16px; margin-bottom:14px; flex-wrap:wrap; }
+.meta-item { font-size:0.72rem; color:var(--text-dim); display:flex; align-items:center; gap:5px; }
+.event-card-footer { display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:14px; border-top: 1px solid rgba(255,255,255,0.06); }
+.crowd-indicator { display:flex; align-items:center; gap:6px; font-size:0.72rem; }
+.crowd-dot { width:7px; height:7px; border-radius:50%; }
+.rating-stars { display:flex; gap:2px; color:var(--gold); font-size:0.78rem; }
+.privacy-tag {
+  font-size:0.6rem; padding:3px 8px; border-radius:2px; letter-spacing:0.1em; text-transform:uppercase;
+}
+.priv-public { background:rgba(61,189,125,0.15); color:#3dbd7d; border:1px solid rgba(61,189,125,0.3); }
+.priv-private { background:rgba(232,144,69,0.15); color:#e89045; border:1px solid rgba(232,144,69,0.3); }
+
+/* ========== CONFLICT RESOLVER PANEL ========== */
+.conflict-section { padding: 0 48px 80px; }
+.conflict-card {
+  background: var(--glass); border: 1px solid rgba(232,144,69,0.3);
+  backdrop-filter: blur(20px); border-radius: 6px; padding: 32px;
+  position:relative; overflow:hidden;
+}
+.conflict-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, transparent, #e89045, transparent);
+}
+.conflict-title { font-family:'Cormorant Garamond',serif; font-size:1.6rem; margin-bottom:6px; }
+.conflict-sub { font-size:0.8rem; color:var(--text-dim); margin-bottom:28px; }
+.conflict-events { display:grid; grid-template-columns: 1fr auto 1fr; gap:20px; align-items:center; margin-bottom:28px; }
+@media(max-width:700px){ .conflict-events { grid-template-columns:1fr; } }
+.conflict-vs { font-family:'Cormorant Garamond',serif; font-size:2rem; color:var(--gold-dim); text-align:center; font-style:italic; }
+.conflict-event-card {
+  border: 1px solid var(--glass-border); border-radius:4px; padding:20px;
+  background: rgba(255,255,255,0.02);
+}
+.conflict-event-card.winner { border-color: var(--gold); background: rgba(201,168,76,0.04); }
+.winner-badge {
+  display:inline-flex; align-items:center; gap:6px; padding:4px 10px;
+  background:rgba(201,168,76,0.15); border:1px solid var(--gold-dim);
+  border-radius:2px; font-size:0.62rem; letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--gold); margin-bottom:12px;
+}
+.conflict-score-bars { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.score-row { display:flex; gap:10px; align-items:center; font-size:0.72rem; }
+.score-label { width:80px; color:var(--text-dim); flex-shrink:0; }
+.score-bar { flex:1; height:4px; background:rgba(255,255,255,0.07); border-radius:2px; overflow:hidden; }
+.score-fill { height:100%; border-radius:2px; background:var(--gold); }
+.score-val { width:28px; text-align:right; font-family:'Space Mono',monospace; font-size:0.65rem; color:var(--gold); }
+.recommend-box {
+  background: rgba(61,189,125,0.07); border: 1px solid rgba(61,189,125,0.25);
+  border-radius:4px; padding:18px 22px; display:flex; align-items:center; gap:14px;
+}
+.recommend-icon { font-size:1.4rem; flex-shrink:0; }
+.recommend-text { font-size:0.82rem; line-height:1.5; }
+.recommend-text strong { color:#3dbd7d; }
+
+/* ========== STATE OVERVIEW ========== */
+.states-section { padding: 0 48px 80px; }
+.states-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; }
+@media(max-width:1100px){ .states-grid { grid-template-columns:repeat(3,1fr); } }
+@media(max-width:700px){ .states-grid { grid-template-columns:1fr 1fr; } }
+.state-overview-card {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px); border-radius:6px; padding:22px 18px;
+  text-align:center; cursor:pointer; transition: all 0.3s;
+  position:relative; overflow:hidden;
+}
+.state-overview-card:hover { border-color:var(--gold); transform:translateY(-4px); }
+.state-overview-card.highlighted { border-color:var(--gold); background:rgba(201,168,76,0.06); }
+.state-emoji { font-size:2rem; margin-bottom:8px; }
+.state-name { font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:500; margin-bottom:4px; }
+.state-count { font-family:'Space Mono',monospace; font-size:0.75rem; color:var(--gold); }
+.state-risk-bar { height:3px; margin-top:12px; border-radius:2px; }
+
+/* ========== FOOTER ========== */
+footer {
+  padding: 48px; border-top: 1px solid var(--glass-border);
+  display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;
+}
+.footer-logo { font-family:'Cormorant Garamond',serif; font-size:1.4rem; color:var(--gold); }
+.footer-text { font-size:0.72rem; color:var(--text-dim); }
+.tech-stack-chips { display:flex; gap:8px; flex-wrap:wrap; }
+.tech-chip {
+  padding:4px 10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+  border-radius:2px; font-size:0.62rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim);
+}
+
+/* ========== MODAL ========== */
+.modal-overlay {
+  position:fixed; inset:0; z-index:2000;
+  background:rgba(1,13,26,0.92); backdrop-filter:blur(16px);
+  display:none; align-items:center; justify-content:center; padding:24px;
+}
+.modal-overlay.open { display:flex; }
+.modal {
+  background: var(--navy-mid); border: 1px solid var(--glass-border);
+  border-radius:8px; max-width:640px; width:100%; max-height:90vh;
+  overflow-y:auto; position:relative;
+  animation: modalIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes modalIn { from{opacity:0;transform:scale(0.9) translateY(20px)} to{opacity:1;transform:none} }
+.modal-header { padding:28px 32px 0; }
+.modal-close {
+  position:absolute; top:16px; right:16px;
+  background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1.2rem;
+  padding:6px; line-height:1; transition:color 0.2s;
+}
+.modal-close:hover { color:var(--cream); }
+.modal-body { padding:24px 32px 32px; }
+.modal-cat { font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
+.modal-title { font-family:'Cormorant Garamond',serif; font-size:2rem; margin-bottom:4px; }
+.modal-state { font-size:0.78rem; color:var(--text-dim); margin-bottom:20px; }
+.modal-section { margin-bottom:20px; }
+.modal-section-title { font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:8px; }
+.modal-desc { font-size:0.87rem; line-height:1.7; color:var(--text-dim); }
+.modal-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.modal-info-item { background:rgba(255,255,255,0.03); border-radius:3px; padding:12px 14px; }
+.modal-info-label { font-size:0.62rem; color:var(--text-dim); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:4px; }
+.modal-info-val { font-size:0.87rem; color:var(--cream); }
+.crowd-meter-wrap { margin-bottom:20px; }
+.crowd-meter-header { display:flex; justify-content:space-between; margin-bottom:8px; font-size:0.8rem; }
+.crowd-meter-bar { height:10px; border-radius:5px; background:rgba(255,255,255,0.07); overflow:hidden; }
+.crowd-meter-fill { height:100%; border-radius:5px; transition:width 0.8s; }
+.modal-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:24px; }
+.book-btn {
+  flex:1; padding:14px; background:var(--gold); border:none; border-radius:3px;
+  color:var(--navy); font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s;
+  font-family:'DM Sans',sans-serif; letter-spacing:0.08em; text-transform:uppercase;
+}
+.book-btn:hover { background:var(--gold-bright); }
+.route-btn {
+  flex:1; padding:14px; background:transparent; border:1px solid var(--glass-border); border-radius:3px;
+  color:var(--cream); font-size:0.85rem; cursor:pointer; transition:all 0.3s;
+  font-family:'DM Sans',sans-serif;
+}
+.route-btn:hover { border-color:var(--gold); color:var(--gold); }
+.booking-confirm {
+  display:none; text-align:center; padding:20px;
+  background: rgba(61,189,125,0.08); border:1px solid rgba(61,189,125,0.3);
+  border-radius:4px; margin-top:16px;
+}
+.booking-confirm.show { display:block; }
+.qr-placeholder {
+  width:80px; height:80px; margin:12px auto;
+  background: var(--cream); border-radius:4px; padding:8px;
+  display:grid; grid-template-columns:repeat(5,1fr); gap:2px;
+}
+.qr-cell { border-radius:1px; }
+.qr-cell.dark { background:var(--navy); }
+.qr-cell.light { background:var(--cream); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">InCity <span>· भारत</span></div>
+  <div class="nav-links">
+    <a href="#map-section" class="active">Map</a>
+    <a href="#crowd-ai">AI Density</a>
+    <a href="#events">Events</a>
+    <a href="#states">States</a>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('events').scrollIntoView({behavior:'smooth'})">Explore Events</button>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <svg class="india-outline" width="480" height="560" viewBox="0 0 480 560" fill="none">
+    <path d="M190 40 L220 30 L260 25 L300 35 L340 50 L370 80 L390 110 L400 145 L410 180 L420 210 L415 240 L400 260 L390 280 L370 300 L360 330 L350 360 L340 390 L320 420 L300 445 L280 465 L260 480 L250 490 L240 500 L230 490 L220 480 L200 460 L180 440 L160 415 L145 390 L140 365 L130 340 L120 315 L110 290 L95 265 L85 240 L80 210 L90 180 L100 155 L115 130 L130 110 L150 85 L170 60 Z" stroke="rgba(201,168,76,0.8)" stroke-width="1.5" fill="rgba(201,168,76,0.03)"/>
+    <path d="M240 500 L235 510 L240 520 L245 510 Z" stroke="rgba(201,168,76,0.6)" stroke-width="1" fill="rgba(201,168,76,0.05)"/>
+    <!-- Islands -->
+    <ellipse cx="145" cy="460" rx="12" ry="20" stroke="rgba(201,168,76,0.5)" stroke-width="1" fill="none"/>
+    <ellipse cx="340" cy="470" rx="8" ry="14" stroke="rgba(201,168,76,0.5)" stroke-width="1" fill="none"/>
+  </svg>
+  <div class="hero-content">
+    <div class="hero-eyebrow">Smart Urban Intelligence · India</div>
+    <h1>Plan Smart.<br><em>Avoid Crowds.</em><br>Experience More.</h1>
+    <p>AI-powered event intelligence for India's 5 major states. Real-time crowd density, YOLOv8 object detection, and CSRNet-based crowd counting — all in one premium interface.</p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="document.getElementById('map-section').scrollIntoView({behavior:'smooth'})">View Live Map</button>
+      <button class="btn-secondary" onclick="document.getElementById('crowd-ai').scrollIntoView({behavior:'smooth'})">AI Crowd Analysis</button>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="stat-card">
+      <div class="stat-val" id="heroEvents">247</div>
+      <div class="stat-label">Active Events</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="heroCrowd">12.4L</div>
+      <div class="stat-label">People Tracked</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="heroZones">38</div>
+      <div class="stat-label">Red Zones</div>
+    </div>
+  </div>
+</section>
+
+<!-- SEARCH -->
+<div class="search-section">
+  <div class="search-bar">
+    <div class="search-field">
+      <label>State</label>
+      <select id="searchState" onchange="filterEvents()">
+        <option value="">All States</option>
+        <option>Maharashtra</option>
+        <option>Delhi</option>
+        <option>Karnataka</option>
+        <option>Tamil Nadu</option>
+        <option>West Bengal</option>
+      </select>
+    </div>
+    <div class="search-field">
+      <label>Category</label>
+      <select id="searchCat" onchange="filterEvents()">
+        <option value="">All Categories</option>
+        <option>Cultural</option>
+        <option>Technology</option>
+        <option>Religious</option>
+        <option>Sports</option>
+        <option>Exhibition</option>
+        <option>Political</option>
+      </select>
+    </div>
+    <div class="search-field">
+      <label>Date</label>
+      <input type="date" id="searchDate" value="2026-03-01">
+    </div>
+    <div class="search-field">
+      <label>Event Name</label>
+      <input type="text" placeholder="Search events..." id="searchQuery" oninput="filterEvents()">
+    </div>
+    <button class="search-btn" onclick="filterEvents()">Search</button>
+  </div>
+</div>
+
+<!-- MAP SECTION -->
+<div class="map-section" id="map-section">
+  <div class="map-header">
+    <div>
+      <div class="section-label">Live Intelligence</div>
+      <div class="section-title" style="margin-bottom:0">Crowd Density Map</div>
+    </div>
+    <div class="map-filters">
+      <div class="filter-chip active" onclick="toggleFilter(this,'all')">All Events</div>
+      <div class="filter-chip" onclick="toggleFilter(this,'public')">Public</div>
+      <div class="filter-chip" onclick="toggleFilter(this,'private')">Private</div>
+      <div class="filter-chip" onclick="toggleFilter(this,'free')">Free</div>
+      <div class="filter-chip" onclick="toggleFilter(this,'paid')">Paid</div>
+    </div>
+  </div>
+  <div class="map-wrapper">
+    <div id="map"></div>
+    <div class="map-overlay-legend">
+      <h4>Density Legend</h4>
+      <div class="legend-row"><div class="legend-dot" style="background:#e84545"></div> Red Zone — Avoid</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#e89045"></div> Orange — Moderate</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#3dbd7d"></div> Green — Safe Access</div>
+      <div class="legend-row"><div class="legend-dot" style="background:rgba(201,168,76,0.9)"></div> Active Event</div>
+    </div>
+    <div class="ai-badge">
+      <div class="ai-pulse"></div>
+      YOLOv8 + CSRNet Live
+    </div>
+  </div>
+</div>
+
+<!-- AI CROWD SECTION -->
+<section class="crowd-ai-section" id="crowd-ai">
+  <div class="section-label">AI Intelligence Engine</div>
+  <div class="section-title">Real-Time Crowd Analytics</div>
+  <div class="divider"></div>
+  <div class="ai-grid">
+    <!-- YOLOv8 Detection Panel -->
+    <div class="ai-card">
+      <div class="ai-card-title">YOLOv8 · Object Detection Grid</div>
+      <div class="model-badge model-yolo">● YOLOv8</div>
+      <div class="model-badge model-csrnet">● CSRNet</div>
+      <div style="margin-top:16px; margin-bottom:8px; font-size:0.72rem; color:var(--text-dim);">Mumbai BKC — Live Frame Analysis</div>
+      <div class="detection-grid" id="detectionGrid"></div>
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:12px;">
+        <div>
+          <div class="crowd-count" id="yoloCount">1,847</div>
+          <div class="crowd-count-sub">Persons detected (YOLOv8 bbox)</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Space Mono',monospace; font-size:0.8rem; color:var(--gold);" id="csrCount">2,103</div>
+          <div style="font-size:0.62rem; color:var(--text-dim);">CSRNet estimate</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk Assessment Panel -->
+    <div class="ai-card">
+      <div class="ai-card-title">Risk Assessment · Hassle Index</div>
+      <div class="risk-meter" style="margin-bottom:24px;">
+        <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:8px;">Current Area Risk Level</div>
+        <div class="risk-track"><div class="risk-needle" id="riskNeedle" style="left:68%"></div></div>
+        <div class="risk-labels"><span>Low</span><span>Moderate</span><span>Critical</span></div>
+      </div>
+      <div class="density-bar-wrap">
+        <div class="density-bar-label"><span>Crowd Density</span><span id="crowdPct">78%</span></div>
+        <div class="density-bar-track"><div class="density-bar-fill" id="crowdBar" style="width:78%; background:linear-gradient(90deg,#e89045,#e84545)"></div></div>
+      </div>
+      <div class="density-bar-wrap">
+        <div class="density-bar-label"><span>Traffic Congestion</span><span id="trafficPct">62%</span></div>
+        <div class="density-bar-track"><div class="density-bar-fill" id="trafficBar" style="width:62%; background:linear-gradient(90deg,#3dbd7d,#e89045)"></div></div>
+      </div>
+      <div class="density-bar-wrap">
+        <div class="density-bar-label"><span>Event Load</span><span id="eventPct">85%</span></div>
+        <div class="density-bar-track"><div class="density-bar-fill" id="eventBar" style="width:85%; background:linear-gradient(90deg,#e89045,#e84545)"></div></div>
+      </div>
+      <div class="alert-list" id="alertList"></div>
+    </div>
+
+    <!-- State Density Breakdown -->
+    <div class="ai-card">
+      <div class="ai-card-title">State Density Comparison</div>
+      <div id="stateDensityBars" style="display:flex; flex-direction:column; gap:12px; margin-top:4px;"></div>
+    </div>
+
+    <!-- Conflict Log -->
+    <div class="ai-card">
+      <div class="ai-card-title">Conflict Resolution Log</div>
+      <div id="conflictLog" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- EVENTS SECTION -->
+<section class="events-section" id="events">
+  <div class="events-header">
+    <div>
+      <div class="section-label">Upcoming Events</div>
+      <div class="section-title" style="margin-bottom:0">Event Stack</div>
+    </div>
+    <div class="state-tabs" id="stateTabs">
+      <div class="state-tab active" onclick="filterByState(this,'all')">All States</div>
+      <div class="state-tab" onclick="filterByState(this,'Maharashtra')">Maharashtra</div>
+      <div class="state-tab" onclick="filterByState(this,'Delhi')">Delhi</div>
+      <div class="state-tab" onclick="filterByState(this,'Karnataka')">Karnataka</div>
+      <div class="state-tab" onclick="filterByState(this,'Tamil Nadu')">Tamil Nadu</div>
+      <div class="state-tab" onclick="filterByState(this,'West Bengal')">West Bengal</div>
+    </div>
+  </div>
+  <div class="events-grid" id="eventsGrid"></div>
+</section>
+
+<!-- CONFLICT RESOLVER -->
+<section class="conflict-section">
+  <div class="section-label">AI Conflict Resolver</div>
+  <div class="section-title">Simultaneous Event Analysis</div>
+  <div class="divider"></div>
+  <div class="conflict-card">
+    <div class="conflict-title">Mumbai · March 2, 2026 · 18:00 IST</div>
+    <div class="conflict-sub">2 overlapping events detected in BKC district — AI ranking in progress</div>
+    <div class="conflict-events">
+      <div class="conflict-event-card winner">
+        <div class="winner-badge">★ Recommended</div>
+        <div style="font-size:0.65rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:4px;">Cultural · BKC Hall A</div>
+        <div style="font-family:'Cormorant Garamond',serif; font-size:1.2rem; margin-bottom:12px;">Pune International Jazz Festival</div>
+        <div class="conflict-score-bars">
+          <div class="score-row"><div class="score-label">Proximity</div><div class="score-bar"><div class="score-fill" style="width:90%"></div></div><div class="score-val">90</div></div>
+          <div class="score-row"><div class="score-label">Crowd</div><div class="score-bar"><div class="score-fill" style="width:55%; background:var(--green-safe)"></div></div><div class="score-val">55</div></div>
+          <div class="score-row"><div class="score-label">Rating</div><div class="score-bar"><div class="score-fill" style="width:88%"></div></div><div class="score-val">4.4</div></div>
+          <div class="score-row"><div class="score-label">Traffic</div><div class="score-bar"><div class="score-fill" style="width:40%; background:var(--green-safe)"></div></div><div class="score-val">Low</div></div>
+        </div>
+      </div>
+      <div class="conflict-vs">vs</div>
+      <div class="conflict-event-card">
+        <div style="font-size:0.65rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">Political · BKC Open Ground</div>
+        <div style="font-family:'Cormorant Garamond',serif; font-size:1.2rem; margin-bottom:12px;">Maharashtra State Rally 2026</div>
+        <div class="conflict-score-bars">
+          <div class="score-row"><div class="score-label">Proximity</div><div class="score-bar"><div class="score-fill" style="width:88%"></div></div><div class="score-val">88</div></div>
+          <div class="score-row"><div class="score-label">Crowd</div><div class="score-bar"><div class="score-fill" style="width:94%; background:var(--red-risk)"></div></div><div class="score-val">94</div></div>
+          <div class="score-row"><div class="score-label">Rating</div><div class="score-bar"><div class="score-fill" style="width:42%"></div></div><div class="score-val">3.1</div></div>
+          <div class="score-row"><div class="score-label">Traffic</div><div class="score-bar"><div class="score-fill" style="width:91%; background:var(--red-risk)"></div></div><div class="score-val">Critical</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="recommend-box">
+      <div class="recommend-icon">🤖</div>
+      <div class="recommend-text">
+        <strong>AI Recommendation:</strong> Attend the Jazz Festival. The Political Rally generates a <strong>Red Zone (Hassle Index: 91)</strong> due to peak traffic and crowd overflow. Suggested bypass: <strong>LBS Marg → Sion flyover → BKC internal road</strong>. Travel time savings: ~34 minutes.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATES OVERVIEW -->
+<section class="states-section" id="states">
+  <div class="section-label">Coverage</div>
+  <div class="section-title">5 States · Active Monitoring</div>
+  <div class="divider"></div>
+  <div class="states-grid" id="statesGrid"></div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div class="footer-logo">InCity</div>
+    <div class="footer-text" style="margin-top:4px;">Smart Event Intelligence · India · 2026</div>
+  </div>
+  <div>
+    <div style="font-size:0.62rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:10px;">Powered By</div>
+    <div class="tech-stack-chips">
+      <div class="tech-chip">YOLOv8</div>
+      <div class="tech-chip">CSRNet</div>
+      <div class="tech-chip">PostGIS</div>
+      <div class="tech-chip">Leaflet.js</div>
+      <div class="tech-chip">AES-256</div>
+      <div class="tech-chip">WebSocket</div>
+      <div class="tech-chip">Redis</div>
+      <div class="tech-chip">FastAPI</div>
+    </div>
+  </div>
+</footer>
+
+<!-- EVENT MODAL -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal" id="modalContent">
+    <button class="modal-close" onclick="document.getElementById('modal').classList.remove('open')">✕</button>
+    <div class="modal-header" id="modalHeader"></div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// ==================== DATA ====================
+const EVENTS = [
+  {
+    id:1, title:'Mumbai Kala Ghoda Arts Festival', state:'Maharashtra', city:'Mumbai', district:'Fort',
+    category:'Cultural', type:'Public', paid:false,
+    date:'2026-03-05', time:'10:00', duration:'7 days',
+    crowd:'high', density:84, rating:4.7, reviews:1240,
+    desc:'South Asia\'s largest urban arts festival featuring 300+ artists, live performances, visual arts, and cultural exhibits across the heritage precinct of Kala Ghoda.',
+    organizer:'Kala Ghoda Association', tickets:'Free Entry',
+    lat:18.9281, lng:72.8317, color:'#8B2252', emoji:'🎨',
+    risk:'orange', bypass:'Take Marine Drive → Backbay → DN Road to avoid congestion near Cross Maidan'
+  },
+  {
+    id:2, title:'Pune International Jazz Festival', state:'Maharashtra', city:'Pune', district:'BKC',
+    category:'Cultural', type:'Public', paid:true,
+    date:'2026-03-02', time:'18:00', duration:'2 days',
+    crowd:'medium', density:58, rating:4.4, reviews:892,
+    desc:'A premium jazz experience featuring international and Indian jazz artistes across three stages in BKC\'s outdoor amphitheatre. Curated cocktail experience included.',
+    organizer:'Pune Jazz Society', tickets:'₹1,200 onwards',
+    lat:18.5204, lng:73.8567, color:'#1a5276', emoji:'🎷',
+    risk:'green', bypass:'Metro Line 1 recommended. Bypass: Nagar Road → Camp → JM Road'
+  },
+  {
+    id:3, title:'Delhi Tech Summit 2026', state:'Delhi', city:'New Delhi', district:'Pragati Maidan',
+    category:'Technology', type:'Public', paid:true,
+    date:'2026-03-10', time:'09:00', duration:'3 days',
+    crowd:'high', density:91, rating:4.6, reviews:3450,
+    desc:'India\'s premier technology confluence — startups, AI demos, policy roundtables, and over 500 exhibitors from 42 nations. Hosted at the newly renovated Bharat Mandapam.',
+    organizer:'Ministry of Electronics & IT', tickets:'₹2,500 onwards',
+    lat:28.6139, lng:77.2090, color:'#1e8449', emoji:'💡',
+    risk:'red', bypass:'DMRC Blue Line to Pragati Maidan metro. Avoid Mathura Road 9AM-7PM'
+  },
+  {
+    id:4, title:'Dilli Haat Utsav', state:'Delhi', city:'New Delhi', district:'INA',
+    category:'Cultural', type:'Public', paid:false,
+    date:'2026-03-08', time:'11:00', duration:'10 days',
+    crowd:'medium', density:62, rating:4.5, reviews:2100,
+    desc:'Annual craft and culture fair at Dilli Haat INA featuring artisans from all 28 states, folk music, regional cuisine trails, and handloom exhibitions.',
+    organizer:'Delhi Tourism & Transport Development Corporation', tickets:'₹30 entry',
+    lat:28.5700, lng:77.2090, color:'#7d3c98', emoji:'🎪',
+    risk:'green', bypass:'INA Metro Station walkable. Auto from Safdarjung available'
+  },
+  {
+    id:5, title:'Bengaluru Startup Expo 2026', state:'Karnataka', city:'Bengaluru', district:'Whitefield',
+    category:'Technology', type:'Public', paid:true,
+    date:'2026-03-14', time:'10:00', duration:'2 days',
+    crowd:'high', density:88, rating:4.3, reviews:1876,
+    desc:'Karnataka\'s largest startup showcase with 600+ startups, VC meetups, product launch events, and mentorship clinics. Focused on AI, SaaS, and Climate Tech.',
+    organizer:'NASSCOM × Startup Karnataka', tickets:'₹999 onwards',
+    lat:12.9716, lng:77.5946, color:'#c0392b', emoji:'🚀',
+    risk:'red', bypass:'Whitefield traffic critical 8-10AM. Use BMTC Volvo or Namma Metro Purple Line'
+  },
+  {
+    id:6, title:'Hampi Utsav 2026', state:'Karnataka', city:'Hampi', district:'Ballari',
+    category:'Cultural', type:'Public', paid:false,
+    date:'2026-03-20', time:'16:00', duration:'3 days',
+    crowd:'medium', density:55, rating:4.9, reviews:3240,
+    desc:'Spectacular heritage festival at the UNESCO World Heritage site of Hampi — dance performances, puppet shows, classical music, and light-and-sound show amid ancient ruins.',
+    organizer:'Karnataka Tourism & Dept of Kannada Culture', tickets:'Free',
+    lat:15.3350, lng:76.4600, color:'#b7950b', emoji:'🏛️',
+    risk:'green', bypass:'Only road access. Book accommodation 3 months in advance'
+  },
+  {
+    id:7, title:'Chennai Music Season Finale', state:'Tamil Nadu', city:'Chennai', district:'Mylapore',
+    category:'Cultural', type:'Public', paid:true,
+    date:'2026-03-07', time:'18:30', duration:'5 days',
+    crowd:'high', density:80, rating:4.8, reviews:5640,
+    desc:'The grand finale of the world-famous Chennai Music Season — classical Carnatic vocal and instrumental concerts at Narada Gana Sabha and Music Academy, featuring legends and rising artists.',
+    organizer:'Madras Music Academy', tickets:'₹500 – ₹3,000',
+    lat:13.0827, lng:80.2707, color:'#d35400', emoji:'🎵',
+    risk:'orange', bypass:'Avoid Luz Junction after 6PM. Use MTC bus 21C or auto via R.A. Puram'
+  },
+  {
+    id:8, title:'Pongal Heritage Trail 2026', state:'Tamil Nadu', city:'Thanjavur', district:'Thanjavur',
+    category:'Religious', type:'Public', paid:false,
+    date:'2026-03-04', time:'07:00', duration:'4 days',
+    crowd:'high', density:93, rating:4.6, reviews:2340,
+    desc:'Immersive cultural journey through the Chola heartland — traditional Pongal cooking, Kolam competitions, Jallikattu viewing, and Brihadeeswara temple tour with special illumination.',
+    organizer:'Tamil Nadu Tourism Development Corporation', tickets:'Free',
+    lat:10.7870, lng:79.1378, color:'#27ae60', emoji:'🪔',
+    risk:'red', bypass:'Temple roads pedestrianized during event. Park at TNSTC bus terminus'
+  },
+  {
+    id:9, title:'Durga Puja Pandal Walk — North Kolkata', state:'West Bengal', city:'Kolkata', district:'North Kolkata',
+    category:'Religious', type:'Public', paid:false,
+    date:'2026-03-12', time:'20:00', duration:'5 days',
+    crowd:'high', density:97, rating:4.9, reviews:8900,
+    desc:'The iconic pandal-hopping experience across 350+ intricately designed Durga Puja pandals in North Kolkata — each a unique art installation. Includes the famous Bagbazar, College Square, and Kumartuli pandals.',
+    organizer:'WBTDC × Local Durga Puja Committees', tickets:'Free',
+    lat:22.5726, lng:88.3639, color:'#e74c3c', emoji:'🪆',
+    risk:'red', bypass:'Metro is essential. Surface roads completely gridlocked after 7PM. Use Girish Park / Central Metro stations'
+  },
+  {
+    id:10, title:'Kolkata International Film Festival', state:'West Bengal', city:'Kolkata', district:'Park Street',
+    category:'Exhibition', type:'Public', paid:true,
+    date:'2026-03-16', time:'11:00', duration:'7 days',
+    crowd:'medium', density:65, rating:4.7, reviews:4210,
+    desc:'South Asia\'s oldest film festival showcasing 200+ films from 70 countries. Screenings at Nandan, Rabindra Sadan, and ICCR. Celebrity interactions and industry masterclasses included.',
+    organizer:'West Bengal Film Centre', tickets:'₹100 – ₹500',
+    lat:22.5448, lng:88.3426, color:'#2980b9', emoji:'🎬',
+    risk:'orange', bypass:'Park Street manageable via Esplanade Metro. Allow 20 min extra for parking'
+  },
+  {
+    id:11, title:'Maharashtra IPL T20 Screening Night', state:'Maharashtra', city:'Mumbai', district:'Andheri',
+    category:'Sports', type:'Public', paid:false,
+    date:'2026-03-06', time:'19:30', duration:'1 day',
+    crowd:'high', density:89, rating:4.2, reviews:567,
+    desc:'Giant-screen live screening of the Mumbai Indians vs. Chennai Super Kings IPL opener at D.Y. Patil Stadium outdoor space. Fan zones, food courts, and DJ setup.',
+    organizer:'BCCI Fan Experience', tickets:'Free',
+    lat:19.0544, lng:73.0129, color:'#1a5276', emoji:'🏏',
+    risk:'red', bypass:'Avoid Eastern Express Highway. Harbour line train to Vashi recommended'
+  },
+  {
+    id:12, title:'Bengaluru Karaga Festival', state:'Karnataka', city:'Bengaluru', district:'Old Bengaluru',
+    category:'Religious', type:'Private', paid:false,
+    date:'2026-03-22', time:'22:00', duration:'1 night',
+    crowd:'high', density:90, rating:4.8, reviews:1890,
+    desc:'Ancient Dravidian festival where the sacred Karaga procession passes through Pete area — a mesmerizing midnight torchlight procession through the old city with thousands of devotees.',
+    organizer:'Tigala Community Council', tickets:'Invite Only',
+    lat:12.9652, lng:77.5970, color:'#884ea0', emoji:'🪔',
+    risk:'red', bypass:'Pete area roads closed midnight–4AM. Approach only from KR Market Metro'
+  },
+];
+
+const STATES_DATA = [
+  { name:'Maharashtra', emoji:'🌊', count:45, risk:72, color:'#c0392b' },
+  { name:'Delhi', emoji:'🏛️', count:38, risk:85, color:'#1e8449' },
+  { name:'Karnataka', emoji:'🌴', count:52, risk:68, color:'#8e44ad' },
+  { name:'Tamil Nadu', emoji:'🏺', count:61, risk:79, color:'#d35400' },
+  { name:'West Bengal', emoji:'🌸', count:51, risk:88, color:'#2980b9' },
+];
+
+const ALERTS = [
+  { text:'Red Zone: Durga Puja — Kolkata North · 97% density', color:'#e84545' },
+  { text:'High Traffic: Delhi Tech Summit · Pragati Maidan', color:'#e89045' },
+  { text:'Bypass Active: BKC Mumbai → LBS Marg Route', color:'#3dbd7d' },
+  { text:'CSRNet Alert: 2,103 estimated at BKC perimeter', color:'#c9a84c' },
+];
+
+const CONFLICT_LOG = [
+  { time:'18:02', text:'Conflict detected: Mumbai BKC · 2 events overlap', level:'red' },
+  { time:'17:45', text:'Bypass suggested: Delhi Mathura Road → NH-48', level:'orange' },
+  { time:'17:30', text:'Resolved: Chennai Mylapore — alternate route via RA Puram', level:'green' },
+  { time:'16:58', text:'Conflict detected: Kolkata Park St × Heritage Walk overlap', level:'orange' },
+  { time:'16:40', text:'AI ranked: Bengaluru Startup Expo > IT Corridor Meet', level:'green' },
+];
+
+// ==================== MAP ====================
+let map, currentFilter = 'all';
+let leafletMarkers = [];
+
+function initMap() {
+  map = L.map('map', {
+    center: [20.5937, 78.9629], zoom: 5,
+    zoomControl: false,
+    attributionControl: false,
+  });
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  // Dark tile layer
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+  }).addTo(map);
+
+  // Add attribution
+  L.control.attribution({ position:'bottomright', prefix:'<span style="color:rgba(201,168,76,0.6);font-size:10px">InCity 2026</span>' }).addTo(map);
+
+  renderMapMarkers();
+  drawDensityCircles();
+}
+
+function getMarkerColor(risk) {
+  if(risk==='red') return '#e84545';
+  if(risk==='orange') return '#e89045';
+  return '#3dbd7d';
+}
+
+function renderMapMarkers() {
+  leafletMarkers.forEach(m => map.removeLayer(m));
+  leafletMarkers = [];
+
+  EVENTS.forEach(ev => {
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="
+        width:32px;height:32px;border-radius:50%;
+        background:${getMarkerColor(ev.risk)};
+        border:2px solid rgba(255,255,255,0.3);
+        display:flex;align-items:center;justify-content:center;
+        font-size:14px;cursor:pointer;
+        box-shadow:0 0 12px ${getMarkerColor(ev.risk)}60;
+        transition:all 0.3s;
+      ">${ev.emoji}</div>`,
+      iconSize:[32,32], iconAnchor:[16,16],
+    });
+    const marker = L.marker([ev.lat, ev.lng], { icon }).addTo(map);
+    marker.bindPopup(`
+      <div style="background:#021428;border:1px solid rgba(201,168,76,0.3);border-radius:4px;padding:12px;min-width:200px;font-family:'DM Sans',sans-serif;">
+        <div style="font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:#c9a84c;margin-bottom:4px;">${ev.category} · ${ev.state}</div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:1rem;color:#f5ead8;margin-bottom:8px;">${ev.title}</div>
+        <div style="font-size:11px;color:rgba(245,234,216,0.5);">📅 ${ev.date} · ⏰ ${ev.time}</div>
+        <div style="margin-top:8px;font-size:11px;">
+          <span style="color:${getMarkerColor(ev.risk)};font-weight:600;">● ${ev.risk.toUpperCase()} ZONE</span>
+          &nbsp;&nbsp;<span style="color:#c9a84c;">Density: ${ev.density}%</span>
+        </div>
+      </div>
+    `, { className:'custom-popup' });
+    leafletMarkers.push(marker);
+  });
+}
+
+function drawDensityCircles() {
+  // State density circles (heatmap simulation)
+  const stateCenters = [
+    { lat:19.076, lng:72.877, density:78, name:'Mumbai Metro' },
+    { lat:28.613, lng:77.209, density:85, name:'Delhi NCR' },
+    { lat:12.971, lng:77.595, density:72, name:'Bengaluru' },
+    { lat:13.082, lng:80.270, density:76, name:'Chennai' },
+    { lat:22.572, lng:88.363, density:90, name:'Kolkata' },
+    { lat:18.520, lng:73.856, density:55, name:'Pune' },
+    { lat:15.335, lng:76.460, density:40, name:'Hampi' },
+    { lat:10.787, lng:79.137, density:88, name:'Thanjavur' },
+  ];
+
+  stateCenters.forEach(s => {
+    let color, fillColor;
+    if(s.density > 80) { color='#e84545'; fillColor='rgba(232,69,69,'; }
+    else if(s.density > 60) { color='#e89045'; fillColor='rgba(232,144,69,'; }
+    else { color='#3dbd7d'; fillColor='rgba(61,189,125,'; }
+
+    // Outer glow ring
+    L.circle([s.lat, s.lng], {
+      radius: 35000, color: color, weight:1, opacity:0.3,
+      fillColor: fillColor + '0.04)', fillOpacity:1,
+    }).addTo(map);
+
+    // Inner density circle
+    const opacity = (s.density / 100) * 0.25;
+    L.circle([s.lat, s.lng], {
+      radius: 18000, color: color, weight:1.5, opacity:0.6,
+      fillColor: fillColor + opacity + ')', fillOpacity:1,
+    }).addTo(map);
+  });
+}
+
+// ==================== DETECTION GRID ====================
+function buildDetectionGrid() {
+  const grid = document.getElementById('detectionGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  const cells = 16;
+  const weights = [
+    'red','red','red','orange',
+    'red','orange','red','red',
+    'orange','red','orange','dim',
+    'green','orange','orange','green'
+  ];
+  weights.forEach((w, i) => {
+    const count = w==='red' ? Math.floor(Math.random()*80+120) : w==='orange' ? Math.floor(Math.random()*60+40) : w==='green' ? Math.floor(Math.random()*20+5) : 0;
+    const cell = document.createElement('div');
+    cell.className = `det-cell ${w}`;
+    cell.textContent = w==='dim' ? '—' : count;
+    cell.title = `Sector ${i+1}: ${count} persons`;
+    grid.appendChild(cell);
+  });
+}
+
+// Simulate live AI updates
+function updateAIMetrics() {
+  const crowdBase = 75 + Math.sin(Date.now()/3000)*12;
+  const trafficBase = 58 + Math.cos(Date.now()/4000)*15;
+  const eventBase = 82 + Math.sin(Date.now()/5000)*8;
+
+  const cp = Math.round(crowdBase);
+  const tp = Math.round(trafficBase);
+  const ep = Math.round(eventBase);
+
+  const crowdBar = document.getElementById('crowdBar');
+  const trafficBar = document.getElementById('trafficBar');
+  const eventBar = document.getElementById('eventBar');
+  const needle = document.getElementById('riskNeedle');
+
+  if(crowdBar) { crowdBar.style.width = cp + '%'; document.getElementById('crowdPct').textContent = cp + '%'; }
+  if(trafficBar) { trafficBar.style.width = tp + '%'; document.getElementById('trafficPct').textContent = tp + '%'; }
+  if(eventBar) { eventBar.style.width = ep + '%'; document.getElementById('eventPct').textContent = ep + '%'; }
+
+  const riskScore = (cp*0.5 + tp*0.2 + ep*0.3);
+  const needlePct = Math.max(5, Math.min(90, riskScore - 8));
+  if(needle) needle.style.left = needlePct + '%';
+
+  const yc = 1700 + Math.floor(Math.random()*300);
+  const cc = yc + Math.floor(Math.random()*400);
+  const yoloEl = document.getElementById('yoloCount');
+  const csrEl = document.getElementById('csrCount');
+  if(yoloEl) yoloEl.textContent = yc.toLocaleString('en-IN');
+  if(csrEl) csrEl.textContent = cc.toLocaleString('en-IN');
+
+  buildDetectionGrid();
+}
+
+// ==================== ALERTS ====================
+function buildAlerts() {
+  const list = document.getElementById('alertList');
+  if(!list) return;
+  list.innerHTML = '';
+  ALERTS.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'alert-item';
+    el.innerHTML = `<div class="alert-dot" style="background:${a.color}"></div><span style="font-size:0.75rem;color:rgba(245,234,216,0.7)">${a.text}</span>`;
+    list.appendChild(el);
+  });
+}
+
+// ==================== STATE DENSITY BARS ====================
+function buildStateDensityBars() {
+  const el = document.getElementById('stateDensityBars');
+  if(!el) return;
+  el.innerHTML = '';
+  STATES_DATA.forEach(s => {
+    const color = s.risk > 80 ? 'var(--red-risk)' : s.risk > 65 ? 'var(--orange-risk)' : 'var(--green-safe)';
+    el.innerHTML += `
+      <div class="density-bar-wrap">
+        <div class="density-bar-label">
+          <span>${s.emoji} ${s.name}</span>
+          <span style="color:${color};font-family:'Space Mono',monospace;font-size:0.7rem;">${s.risk}%</span>
+        </div>
+        <div class="density-bar-track">
+          <div class="density-bar-fill" style="width:${s.risk}%; background:${color}"></div>
+        </div>
+      </div>`;
+  });
+}
+
+// ==================== CONFLICT LOG ====================
+function buildConflictLog() {
+  const el = document.getElementById('conflictLog');
+  if(!el) return;
+  el.innerHTML = '';
+  CONFLICT_LOG.forEach(c => {
+    const color = c.level==='red' ? 'var(--red-risk)' : c.level==='orange' ? 'var(--orange-risk)' : 'var(--green-safe)';
+    el.innerHTML += `
+      <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+        <div style="font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--gold-dim);flex-shrink:0;margin-top:2px">${c.time}</div>
+        <div style="width:6px;height:6px;border-radius:50%;background:${color};margin-top:5px;flex-shrink:0"></div>
+        <div style="font-size:0.73rem;color:rgba(245,234,216,0.7);line-height:1.4">${c.text}</div>
+      </div>`;
+  });
+}
+
+// ==================== EVENTS GRID ====================
+let currentStateFilter = 'all';
+
+function getCategoryColor(cat) {
+  const map = { Cultural:'#8B2252', Technology:'#1a5276', Religious:'#b7950b', Sports:'#154360', Exhibition:'#1a3c34', Political:'#4a1942' };
+  return map[cat] || '#333';
+}
+
+function renderEvents(evs) {
+  const grid = document.getElementById('eventsGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!evs.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-dim);font-size:0.9rem">No events found matching your filters.</div>`;
+    return;
+  }
+  evs.forEach(ev => {
+    const crowdColor = ev.risk==='red' ? '#e84545' : ev.risk==='orange' ? '#e89045' : '#3dbd7d';
+    const crowdLabel = ev.risk==='red' ? 'High Crowd' : ev.risk==='orange' ? 'Moderate' : 'Low Crowd';
+    const stars = '★'.repeat(Math.round(ev.rating)) + '☆'.repeat(5-Math.round(ev.rating));
+    const card = document.createElement('div');
+    card.className = 'event-card';
+    card.onclick = () => openModal(ev);
+    card.innerHTML = `
+      <div class="event-card-banner" style="background:linear-gradient(135deg,${getCategoryColor(ev.category)},${getCategoryColor(ev.category)}88);">
+        <div style="font-size:3rem;opacity:0.6;z-index:1;">${ev.emoji}</div>
+        <div class="event-cat-badge" style="background:rgba(0,0,0,0.5);color:var(--cream);">${ev.category}</div>
+        <div class="event-rank-badge">${ev.id < 10 ? '0'+ev.id : ev.id}</div>
+      </div>
+      <div class="event-card-body">
+        <div class="event-card-state">${ev.city}, ${ev.state}</div>
+        <div class="event-card-title">${ev.title}</div>
+        <div class="event-card-meta">
+          <div class="meta-item">📅 ${ev.date}</div>
+          <div class="meta-item">⏰ ${ev.time}</div>
+          <div class="meta-item">📍 ${ev.district}</div>
+        </div>
+        <div class="event-card-meta">
+          <div class="meta-item">⏳ ${ev.duration}</div>
+          <div class="meta-item">🎟️ ${ev.paid ? 'Paid' : 'Free'}</div>
+        </div>
+        <div class="event-card-footer">
+          <div class="crowd-indicator">
+            <div class="crowd-dot" style="background:${crowdColor};box-shadow:0 0 6px ${crowdColor}60"></div>
+            <span style="color:${crowdColor}">${crowdLabel}</span>
+          </div>
+          <div class="rating-stars" title="${ev.rating}/5">${stars.slice(0,5)}</div>
+          <span class="privacy-tag ${ev.type==='Public'?'priv-public':'priv-private'}">${ev.type}</span>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+function filterByState(el, state) {
+  document.querySelectorAll('.state-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentStateFilter = state;
+  filterEvents();
+}
+
+function filterEvents() {
+  const stateFilter = currentStateFilter;
+  const catFilter = document.getElementById('searchCat')?.value || '';
+  const query = (document.getElementById('searchQuery')?.value || '').toLowerCase();
+
+  let filtered = EVENTS.filter(ev => {
+    if(stateFilter !== 'all' && ev.state !== stateFilter) return false;
+    if(catFilter && ev.category !== catFilter) return false;
+    if(query && !ev.title.toLowerCase().includes(query) && !ev.city.toLowerCase().includes(query)) return false;
+    return true;
+  });
+
+  renderEvents(filtered);
+}
+
+function toggleFilter(el, type) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ==================== MODAL ====================
+function openModal(ev) {
+  const header = document.getElementById('modalHeader');
+  const body = document.getElementById('modalBody');
+  const crowdColor = ev.risk==='red' ? '#e84545' : ev.risk==='orange' ? '#e89045' : '#3dbd7d';
+  const crowdLabel = ev.risk==='red' ? 'High — Avoid if possible' : ev.risk==='orange' ? 'Moderate — Plan accordingly' : 'Low — Safe to visit';
+  const stars = '★'.repeat(Math.floor(ev.rating)) + (ev.rating%1>=0.5?'½':'') + '☆'.repeat(5-Math.ceil(ev.rating));
+
+  header.innerHTML = `
+    <div class="modal-cat">${ev.emoji} ${ev.category} · ${ev.state}</div>
+    <div class="modal-title">${ev.title}</div>
+    <div class="modal-state">📍 ${ev.district}, ${ev.city} · ${ev.date} · ${ev.time}</div>`;
+
+  body.innerHTML = `
+    <div class="crowd-meter-wrap">
+      <div class="crowd-meter-header">
+        <span style="font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold-dim)">Crowd Density Index</span>
+        <span style="color:${crowdColor};font-weight:600;">${crowdLabel}</span>
+      </div>
+      <div class="crowd-meter-bar">
+        <div class="crowd-meter-fill" style="width:${ev.density}%;background:${crowdColor}"></div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">About this Event</div>
+      <div class="modal-desc">${ev.desc}</div>
+    </div>
+    <div class="modal-info-grid">
+      <div class="modal-info-item"><div class="modal-info-label">Organizer</div><div class="modal-info-val">${ev.organizer}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Tickets</div><div class="modal-info-val">${ev.tickets}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Duration</div><div class="modal-info-val">${ev.duration}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Privacy</div><div class="modal-info-val">${ev.type}</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">Rating</div><div class="modal-info-val" style="color:var(--gold)">${stars} (${ev.rating}/5 · ${ev.reviews.toLocaleString('en-IN')} reviews)</div></div>
+      <div class="modal-info-item"><div class="modal-info-label">AI Risk Level</div><div class="modal-info-val" style="color:${crowdColor}">${ev.risk.toUpperCase()}</div></div>
+    </div>
+    <div class="modal-section" style="margin-top:20px;">
+      <div class="modal-section-title">🗺️ AI Suggested Bypass Route</div>
+      <div style="background:rgba(61,189,125,0.07);border:1px solid rgba(61,189,125,0.2);border-radius:3px;padding:12px;font-size:0.82rem;color:rgba(245,234,216,0.8);line-height:1.6">${ev.bypass}</div>
+    </div>
+    <div class="modal-actions">
+      ${ev.type==='Private' ? 
+        `<button class="book-btn" style="background:var(--orange-risk)" onclick="alert('🔐 Private Event — Enter your Digital Invite Key to proceed')">🔐 Enter Invite Key</button>` :
+        `<button class="book-btn" onclick="showBookingConfirm(this, '${ev.title}')">Book Now →</button>`
+      }
+      <button class="route-btn" onclick="alert('🗺️ Opening route: ${ev.bypass}')">Get Route</button>
+    </div>
+    <div class="booking-confirm" id="bookConfirm">
+      <div style="font-size:0.75rem;letter-spacing:0.15em;text-transform:uppercase;color:#3dbd7d;margin-bottom:8px">✓ Booking Confirmed</div>
+      <div style="font-size:0.85rem;margin-bottom:12px;">Your ticket for <strong>${ev.title}</strong> has been generated.</div>
+      <div class="qr-placeholder" id="qrCode"></div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.68rem;color:var(--gold);margin-top:8px">IC-${Math.random().toString(36).substr(2,8).toUpperCase()}</div>
+    </div>`;
+
+  // Generate QR visual
+  setTimeout(() => {
+    const qr = document.getElementById('qrCode');
+    if(qr) {
+      for(let i=0;i<25;i++){
+        const cell = document.createElement('div');
+        cell.className = 'qr-cell ' + (Math.random()>0.45?'dark':'light');
+        qr.appendChild(cell);
+      }
+    }
+  }, 100);
+
+  document.getElementById('modal').classList.add('open');
+}
+
+function showBookingConfirm(btn, title) {
+  btn.disabled = true; btn.textContent = '✓ Booked!'; btn.style.background = '#3dbd7d';
+  const confirm = document.getElementById('bookConfirm');
+  if(confirm) confirm.classList.add('show');
+}
+
+function closeModal(e) {
+  if(e.target.id === 'modal') document.getElementById('modal').classList.remove('open');
+}
+
+// ==================== STATES OVERVIEW ====================
+function buildStatesGrid() {
+  const el = document.getElementById('statesGrid');
+  if(!el) return;
+  el.innerHTML = '';
+  STATES_DATA.forEach(s => {
+    const riskColor = s.risk > 80 ? '#e84545' : s.risk > 65 ? '#e89045' : '#3dbd7d';
+    const div = document.createElement('div');
+    div.className = 'state-overview-card';
+    div.innerHTML = `
+      <div class="state-emoji">${s.emoji}</div>
+      <div class="state-name">${s.name}</div>
+      <div class="state-count">${s.count} events</div>
+      <div class="state-risk-bar" style="background:linear-gradient(90deg,${riskColor} ${s.risk}%,rgba(255,255,255,0.07) ${s.risk}%)"></div>
+      <div style="font-size:0.62rem;color:${riskColor};margin-top:4px">Risk: ${s.risk}%</div>`;
+    div.onclick = () => {
+      document.querySelectorAll('.state-tab').forEach(t => {
+        t.classList.toggle('active', t.textContent === s.name);
+        if(t.textContent === 'All States') t.classList.remove('active');
+      });
+      currentStateFilter = s.name;
+      filterEvents();
+      document.getElementById('events').scrollIntoView({ behavior:'smooth' });
+    };
+    el.appendChild(div);
+  });
+}
+
+// ==================== HERO COUNTER ANIMATION ====================
+function animateCounter(el, target, suffix='') {
+  let start = 0;
+  const step = target / 60;
+  const timer = setInterval(() => {
+    start = Math.min(start + step, target);
+    el.textContent = Math.floor(start) + suffix;
+    if(start >= target) clearInterval(timer);
+  }, 16);
+}
+
+// ==================== CUSTOM MAP POPUP STYLE ====================
+const mapStyle = document.createElement('style');
+mapStyle.textContent = `
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+    background: transparent !important; box-shadow:none !important; padding:0 !important;
+  }
+  .leaflet-popup-content { margin:0 !important; }
+  .leaflet-popup-close-button { color:rgba(201,168,76,0.8) !important; top:4px !important; right:8px !important; font-size:16px !important; }
+  .leaflet-control-zoom { border:1px solid rgba(201,168,76,0.2) !important; border-radius:3px !important; overflow:hidden; }
+  .leaflet-control-zoom a { background:rgba(1,13,26,0.9) !important; color:var(--gold) !important; border-bottom:1px solid rgba(201,168,76,0.15) !important; }
+  .leaflet-control-zoom a:hover { background:rgba(201,168,76,0.15) !important; }
+`;
+document.head.appendChild(mapStyle);
+
+// ==================== INIT ====================
+window.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  buildDetectionGrid();
+  buildAlerts();
+  buildStateDensityBars();
+  buildConflictLog();
+  renderEvents(EVENTS);
+  buildStatesGrid();
+
+  // Hero counter
+  setTimeout(() => {
+    const ev = document.getElementById('heroEvents');
+    const cr = document.getElementById('heroCrowd');
+    const zo = document.getElementById('heroZones');
+    if(ev) animateCounter(ev, 247, '');
+    if(zo) animateCounter(zo, 38, '');
+  }, 400);
+
+  // Live AI metrics loop
+  setInterval(updateAIMetrics, 2200);
+  updateAIMetrics();
+
+  // Nav active states
+  window.addEventListener('scroll', () => {
+    const sections = ['home','map-section','crowd-ai','events','states'];
+    const links = document.querySelectorAll('.nav-links a');
+    const scrollY = window.scrollY + 80;
+    sections.forEach((id, i) => {
+      const el = document.getElementById(id);
+      if(el && scrollY >= el.offsetTop && scrollY < el.offsetTop + el.offsetHeight) {
+        links.forEach(l => l.classList.remove('active'));
+        if(links[i-1]) links[i-1].classList.add('active');
+      }
+    });
+  });
+
+  // Entrance animations on scroll
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting) {
+        e.target.style.opacity = '1';
+        e.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.ai-card, .event-card, .state-overview-card, .conflict-card').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(24px)';
+    el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+    observer.observe(el);
+  });
+});
+</script>
+</body>
+</html>
